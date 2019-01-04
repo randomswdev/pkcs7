@@ -42,6 +42,20 @@ func NewSignedData(data []byte) (*SignedData, error) {
 	return &SignedData{sd: sd, data: data, digestOid: OIDDigestAlgorithmSHA1}, nil
 }
 
+// NewSignedDataFromDigest takes a digest calculated from data using the hashing
+// algorithm identified by the given digestOID and initializes a PKCS7 SignedData
+// struct that is ready to be signed via AddSigner. The digest algorithm is set
+// to the digestOID supplied by the caller and MUST NOT be  changed by calling
+// SetDigestAlgorithm to avoid inconsistencies.
+func NewSignedDataFromDigest(digest []byte, digestOID asn1.ObjectIdentifier) (*SignedData, error) {
+	ci := contentInfo{ContentType: OIDData}
+	sd := signedData{
+		ContentInfo: ci,
+		Version:     1,
+	}
+	return &SignedData{sd: sd, messageDigest: digest, digestOid: digestOID}, nil
+}
+
 // SignerInfoConfig are optional values to include when adding a signer
 type SignerInfoConfig struct {
 	ExtraSignedAttributes   []Attribute
@@ -97,9 +111,14 @@ type issuerAndSerial struct {
 
 // SetDigestAlgorithm sets the digest algorithm to be used in the signing process.
 //
-// This should be called before adding signers
-func (sd *SignedData) SetDigestAlgorithm(d asn1.ObjectIdentifier) {
-	sd.digestOid = d
+// This should be called before adding signers, unless the SignedData struct was
+// initialised from a digest.
+func (sd *SignedData) SetDigestAlgorithm(d asn1.ObjectIdentifier) error {
+	if sd.digestOid == nil {
+		sd.digestOid = d
+		return nil
+	}
+	return fmt.Errorf("digest algorithm was already set")
 }
 
 // SetEncryptionAlgorithm sets the encryption algorithm to be used in the signing process.
@@ -134,9 +153,18 @@ func (sd *SignedData) AddSignerChain(ee *x509.Certificate, pkey crypto.PrivateKe
 	if err != nil {
 		return err
 	}
-	h := hash.New()
-	h.Write(sd.data)
-	sd.messageDigest = h.Sum(nil)
+	if sd.data != nil {
+		// only calculate the messageDigest if the SignedData struct was not
+		// initialised with pre-calculated digest (in which case there is no data
+		// available to compute the messageDigest on)
+		h := hash.New()
+		h.Write(sd.data)
+		sd.messageDigest = h.Sum(nil)
+	}
+
+	if sd.messageDigest == nil {
+		return fmt.Errorf("at least one of data or data digest must be populated")
+	}
 	encryptionOid, err := getOIDForEncryptionAlgorithm(pkey, sd.digestOid)
 	if err != nil {
 		return err
@@ -209,9 +237,18 @@ func (sd *SignedData) SignWithoutAttr(ee *x509.Certificate, pkey crypto.PrivateK
 	if err != nil {
 		return err
 	}
-	h := hash.New()
-	h.Write(sd.data)
-	sd.messageDigest = h.Sum(nil)
+	if sd.data != nil {
+		// only calculate the messageDigest if the SignedData struct was not
+		// initialised with pre-calculated digest (in which case there is no data
+		// available to compute the messageDigest on)
+		h := hash.New()
+		h.Write(sd.data)
+		sd.messageDigest = h.Sum(nil)
+	}
+
+	if sd.messageDigest == nil {
+		return fmt.Errorf("at least one of data or data digest must be populated")
+	}
 	switch pkey.(type) {
 	case *dsa.PrivateKey:
 		// dsa doesn't implement crypto.Signer so we make a special case
