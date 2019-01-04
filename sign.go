@@ -118,7 +118,7 @@ func (sd *SignedData) SetDigestAlgorithm(d asn1.ObjectIdentifier) error {
 		sd.digestOid = d
 		return nil
 	}
-	return fmt.Errorf("digest algorithm was already set")
+	return errors.New("digest algorithm was already set")
 }
 
 // SetEncryptionAlgorithm sets the encryption algorithm to be used in the signing process.
