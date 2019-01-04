@@ -3,6 +3,7 @@ package pkcs7
 import (
 	"bytes"
 	"crypto/dsa"
+	"crypto/sha1"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
@@ -163,27 +164,71 @@ func ExampleSignedData() {
 		fmt.Printf("Cannot create test certificates: %s", err)
 	}
 
+	clearText := []byte("Example data to be signed")
+
+	//
+	// 1ST EXAMPLE: GENERATE A DETACHED PKCS#7 SIGNATURE FROM AN ARRAY OF BYTES
+	//
+
 	// Initialize a SignedData struct with content to be signed
-	signedData, err := NewSignedData([]byte("Example data to be signed"))
+	signedData1, err := NewSignedData(clearText)
 	if err != nil {
 		fmt.Printf("Cannot initialize signed data: %s", err)
 	}
 
 	// Add the signing cert and private key
-	if err := signedData.AddSigner(cert.Certificate, cert.PrivateKey, SignerInfoConfig{}); err != nil {
+	if err := signedData1.AddSigner(cert.Certificate, cert.PrivateKey, SignerInfoConfig{}); err != nil {
 		fmt.Printf("Cannot add signer: %s", err)
 	}
 
 	// Call Detach() is you want to remove content from the signature
 	// and generate an S/MIME detached signature
-	signedData.Detach()
+	signedData1.Detach()
 
 	// Finish() to obtain the signature bytes
-	detachedSignature, err := signedData.Finish()
+	detachedSignature1, err := signedData1.Finish()
 	if err != nil {
 		fmt.Printf("Cannot finish signing data: %s", err)
 	}
-	pem.Encode(os.Stdout, &pem.Block{Type: "PKCS7", Bytes: detachedSignature})
+	pem.Encode(os.Stdout, &pem.Block{Type: "PKCS7", Bytes: detachedSignature1})
+
+	//
+	// 2ND EXAMPLE: GENERATE A DETACHED PKCS#7 SIGNATURE FROM A PRE-CALCULATED
+	// HASH OF THE SAME ARRAY OF BYTES (NO SIGNED TIME ATTRIBUTE: THE TWO MUST MATCH)
+	//
+
+	// Initialize a SignedData struct with the pre-calculated hash of the content
+	// to be signed (by default SignedData uses SHA1 for hashing, so we use it)
+	digest := sha1.Sum(clearText)
+	signedData2, err := NewSignedDataFromDigest(digest[:], OIDDigestAlgorithmSHA1)
+	if err != nil {
+		fmt.Printf("Cannot initialize signed data: %s", err)
+	}
+
+	// Add the signing cert and private key
+	if err := signedData2.AddSigner(cert.Certificate, cert.PrivateKey, SignerInfoConfig{}); err != nil {
+		fmt.Printf("Cannot add signer: %s", err)
+	}
+
+	// No need to call Detach() in this case, as there is no content to remove
+	// (the call is effectively a no-op)
+	signedData2.Detach()
+
+	// Finish() to obtain the signature bytes
+	detachedSignature2, err := signedData2.Finish()
+	if err != nil {
+		fmt.Printf("Cannot finish signing data: %s", err)
+	}
+	pem.Encode(os.Stdout, &pem.Block{Type: "PKCS7", Bytes: detachedSignature2})
+
+	//
+	// NOW CHECK THE TWO SIGNATURE ARE EXACTLY THE SAME
+	//
+	if !bytes.Equal(detachedSignature1, detachedSignature2) {
+		fmt.Printf("Detached and pre-digested signatures do not match")
+	} else {
+		fmt.Println("Signatures match")
+	}
 }
 
 func TestUnmarshalSignedAttribute(t *testing.T) {
