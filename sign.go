@@ -114,7 +114,7 @@ type issuerAndSerial struct {
 // This should be called before adding signers, unless the SignedData struct was
 // initialised from a digest.
 func (sd *SignedData) SetDigestAlgorithm(d asn1.ObjectIdentifier) error {
-	if sd.digestOid == nil {
+	if equal(sd.digestOid, OIDDigestAlgorithmSHA1) && sd.messageDigest == nil {
 		sd.digestOid = d
 		return nil
 	}
@@ -462,4 +462,18 @@ func DegenerateCertificate(cert []byte) ([]byte, error) {
 		Content:     asn1.RawValue{Class: 2, Tag: 0, Bytes: content, IsCompound: true},
 	}
 	return asn1.Marshal(signedContent)
+}
+
+// equal tells whether a and b contain the same elements.
+// A nil argument is equivalent to an empty slice.
+func equal(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }
