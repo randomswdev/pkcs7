@@ -96,7 +96,7 @@ func verifySignature(p7 *PKCS7, content contentTypes, signer signerInfo, trustst
 		if err != nil {
 			return err
 		}
-		hash, err := getHashForOID(signer.DigestAlgorithm.Algorithm)
+		hash, err := GetHashForOID(signer.DigestAlgorithm.Algorithm)
 		if err != nil {
 			return err
 		}

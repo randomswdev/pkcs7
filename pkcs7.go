@@ -82,7 +82,8 @@ var (
 	OIDEncryptionAlgorithmAES256GCM  = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 1, 46}
 )
 
-func getHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
+// GetHashForOID takes an OID digest algorithm and returns the corresponding hash algorithm
+func GetHashForOID(oid asn1.ObjectIdentifier) (crypto.Hash, error) {
 	switch {
 	case oid.Equal(OIDDigestAlgorithmSHA1), oid.Equal(OIDDigestAlgorithmECDSASHA1),
 		oid.Equal(OIDDigestAlgorithmDSA), oid.Equal(OIDDigestAlgorithmDSASHA1),
@@ -157,7 +158,7 @@ func Parse(data []byte) (p7 *PKCS7, err error) {
 		return nil, errors.New("pkcs7: input data is empty")
 	}
 	var info contentInfo
-	der, err := ber2der(data)
+	der, err := BER2DER(data)
 	if err != nil {
 		return nil, err
 	}
