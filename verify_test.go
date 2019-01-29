@@ -2,6 +2,7 @@ package pkcs7
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
@@ -27,6 +28,50 @@ func TestVerify(t *testing.T) {
 	}
 	expected := []byte("We the People")
 	if !bytes.Equal(p7.Content, expected) {
+		t.Errorf("Signed content does not match.\n\tExpected:%s\n\tActual:%s", expected, p7.Content)
+
+	}
+}
+
+func TestVerifyDetached(t *testing.T) {
+	fixture := UnmarshalTestFixture(SignedTestFixture)
+	p7, err := Parse(fixture.Input)
+	if err != nil {
+		t.Errorf("Parse encountered unexpected error: %v", err)
+	}
+
+	content := p7.Content
+	p7.Content = nil
+
+	if err := p7.VerifyDetached(content); err != nil {
+		t.Errorf("Verify failed with error: %v", err)
+	}
+	expected := []byte("We the People")
+	if !bytes.Equal(content, expected) {
+		t.Errorf("Signed content does not match.\n\tExpected:%s\n\tActual:%s", expected, p7.Content)
+
+	}
+}
+
+func TestVerifyHashes(t *testing.T) {
+	fixture := UnmarshalTestFixture(SignedTestFixture)
+	p7, err := Parse(fixture.Input)
+	if err != nil {
+		t.Errorf("Parse encountered unexpected error: %v", err)
+	}
+
+	content := p7.Content
+	p7.Content = nil
+
+	hasher := crypto.SHA1.New()
+	hasher.Write(content)
+	hash := hasher.Sum(nil)
+
+	if err := p7.VerifyDetachedByHashes(map[crypto.Hash][]byte{crypto.SHA1: hash}); err != nil {
+		t.Errorf("Verify failed with error: %v", err)
+	}
+	expected := []byte("We the People")
+	if !bytes.Equal(content, expected) {
 		t.Errorf("Signed content does not match.\n\tExpected:%s\n\tActual:%s", expected, p7.Content)
 
 	}
